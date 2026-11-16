@@ -1,0 +1,15 @@
+build/
+dist/
+*.img
+*.elf
+*.lst
+*.map
+*.d
+sdcard/start4.elf
+sdcard/fixup4.dat
+sdcard/bcm2711-rpi-4-b.dtb
+sdcard/armstub7-rpi4.bin
+sdcard/config.txt
+sdcard/spcconfig.ini
+sdcard/LICENCE.broadcom
+sdcard/COPYING.linux

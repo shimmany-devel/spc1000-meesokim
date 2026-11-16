@@ -44,6 +44,26 @@ static u16 BrightenRGB565(u16 c)
 	return (u16)((r << 11) | (g << 5) | b);
 }
 
+// Expand 320 8bpp MC6847 pixels horizontally 2x into RGB565 destination with alignment safety.
+static inline void WriteScanline2x(u16 *dst, const u8 *src, const u32 *pal_table)
+{
+	if (((uintptr_t)dst & 3) == 0)
+	{
+		u32 *d = (u32 *)dst;
+		for (unsigned x = 0; x < 320; x++)
+			d[x] = pal_table[src[x]];
+	}
+	else
+	{
+		for (unsigned x = 0; x < 320; x++)
+		{
+			u32 p = pal_table[src[x]];
+			dst[x * 2] = (u16)p;
+			dst[x * 2 + 1] = (u16)(p >> 16);
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // On-screen display (OSD) via uGUI: shows the current tape filename at the
 // top of the screen for a few seconds after ALT+LEFT/ALT+RIGHT.
@@ -617,7 +637,7 @@ TShutdownMode CKernel::Run (void){
 	unsigned sw = pFB->GetWidth();
 	unsigned sh = pFB->GetHeight();
 	unsigned pitch = pFB->GetPitch() / 2;
-	unsigned offX = (sw > 640) ? (sw - 640) / 2 : 0;
+	unsigned offX = ((sw > 640) ? (sw - 640) / 2 : 0) & ~3u;
 	unsigned offY = (sh > 480) ? (sh - 480) / 2 : 0;
 
 	// Set up the uGUI OSD overlay (RGB565, drawn on top of the MC6847 image)
@@ -806,42 +826,17 @@ TShutdownMode CKernel::Run (void){
 					u16 *dst1 = pScreen + (dst_y1 + offY) * pitch + offX;
 					const u8 *src = mc6847_buf + y * 320;
 
-					if (!skip0 && !skip1)
+					if (!skip0)
 					{
-						u64 *d0 = (u64 *)dst0;
-						for (unsigned x = 0; x < 320; x += 2)
-						{
-							u64 p0 = cur_pal32[src[x]];
-							u64 p1 = cur_pal32[src[x + 1]];
-							d0[x >> 1] = p0 | (p1 << 32);
-						}
-						if (!g_scanline_mode)
+						WriteScanline2x(dst0, src, cur_pal32);
+						if (!skip1 && !g_scanline_mode)
 						{
 							memcpy(dst1, dst0, 640 * sizeof(u16));
 						}
 					}
-					else if (!skip0)
+					else if (!g_scanline_mode) // skip0 && !skip1
 					{
-						u64 *d0 = (u64 *)dst0;
-						for (unsigned x = 0; x < 320; x += 2)
-						{
-							u64 p0 = cur_pal32[src[x]];
-							u64 p1 = cur_pal32[src[x + 1]];
-							d0[x >> 1] = p0 | (p1 << 32);
-						}
-					}
-					else // !skip1
-					{
-						if (!g_scanline_mode)
-						{
-							u64 *d1 = (u64 *)dst1;
-							for (unsigned x = 0; x < 320; x += 2)
-							{
-								u64 p0 = cur_pal32[src[x]];
-								u64 p1 = cur_pal32[src[x + 1]];
-								d1[x >> 1] = p0 | (p1 << 32);
-							}
-						}
+						WriteScanline2x(dst1, src, cur_pal32);
 					}
 				}
 				DrawOsd();

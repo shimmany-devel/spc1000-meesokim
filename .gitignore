@@ -6,3 +6,7 @@ cfg
 *.lst
 *.sym
 *.noi
+dist/
+emu2149/build/
+samdisk/build/
+
